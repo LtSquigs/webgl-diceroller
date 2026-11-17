@@ -182,7 +182,8 @@ int DicePhysicsEngine::addDynamicBox(int userId, float mass,
     }
     if (userId < 0) return -1;
     for (const auto& d : dynamics_) if (d.userId == userId) return -1;
-    if (mass <= 0.0f || hx <= 0.0f || hy <= 0.0f || hz <= 0.0f) return -1;
+    if (!positiveFinite(mass) || !positiveFinite(hx) || !positiveFinite(hy) || !positiveFinite(hz)) return -1;
+    if (!allFinite(cx, cy, cz) || !allFinite(qx, qy, qz) || !std::isfinite(qw)) return -1;
 
     DynamicBody body;
     body.userId = userId;
@@ -215,13 +216,15 @@ int DicePhysicsEngine::addDynamicHull(int userId, float mass,
     }
     if (userId < 0) return -1;
     for (const auto& d : dynamics_) if (d.userId == userId) return -1;
-    if (mass <= 0.0f) return -1;
+    if (!positiveFinite(mass)) return -1;
+    if (!allFinite(cx, cy, cz) || !allFinite(qx, qy, qz) || !std::isfinite(qw)) return -1;
     if (flatVerts.size() % 3 != 0) return -1;
     if (flatVerts.size() / 3 > MAX_VERTICES_PER_HULL) return -1;
 
     std::vector<Vec3> verts;
     verts.reserve(flatVerts.size() / 3);
     for (size_t i = 0; i < flatVerts.size(); i += 3) {
+        if (!allFinite(flatVerts[i], flatVerts[i + 1], flatVerts[i + 2])) return -1;
         verts.push_back({flatVerts[i], flatVerts[i + 1], flatVerts[i + 2]});
     }
     if (verts.empty()) return -1;

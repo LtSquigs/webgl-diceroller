@@ -77,7 +77,7 @@ void DicePhysicsEngine::reset() {
 
 int DicePhysicsEngine::addDie(int sides, float x, float y, float z) {
     if (bodies_.size() >= static_cast<size_t>(MAX_DICE)) return -1;
-    if (std::isnan(x) || std::isnan(y) || std::isnan(z)) return -1;
+    if (!allFinite(x, y, z)) return -1;
     RigidBody b;
     b.id = nextId_++;
     b.sides = sides;
@@ -127,7 +127,7 @@ void DicePhysicsEngine::setDieHull(int id, const std::vector<float>& flatVerts) 
         verts.reserve(flatVerts.size() / 3);
         for (size_t i = 0; i < flatVerts.size(); i += 3) {
             float vx = flatVerts[i], vy = flatVerts[i+1], vz = flatVerts[i+2];
-            if (std::isnan(vx) || std::isnan(vy) || std::isnan(vz)) continue;
+            if (!allFinite(vx, vy, vz)) continue;
             verts.push_back({vx, vy, vz});
         }
         b.hull.build(verts);
@@ -234,7 +234,8 @@ int DicePhysicsEngine::addStaticBox(int userId,
     }
     if (userId < 0) return -1;
     for (const auto& s : statics_) if (s.userId == userId) return -1;
-    if (hx <= 0.0f || hy <= 0.0f || hz <= 0.0f) return -1;
+    if (!positiveFinite(hx) || !positiveFinite(hy) || !positiveFinite(hz)) return -1;
+    if (!allFinite(cx, cy, cz) || !allFinite(qx, qy, qz) || !std::isfinite(qw)) return -1;
 
     StaticBody body;
     body.userId = userId;
@@ -261,9 +262,10 @@ int DicePhysicsEngine::addStaticPlane(int userId, float nx, float ny, float nz, 
     }
     if (userId < 0) return -1;
     for (const auto& s : statics_) if (s.userId == userId) return -1;
+    if (!allFinite(nx, ny, nz) || !std::isfinite(dist)) return -1;
     Vec3 n{nx, ny, nz};
     const float len = n.length();
-    if (len < 1e-6f) return -1;
+    if (!(len >= 1e-6f) || !std::isfinite(len)) return -1;
     n = n * (1.0f / len);
 
     StaticBody body;
@@ -300,6 +302,7 @@ int DicePhysicsEngine::addStaticConvexHull(int userId,
     std::vector<Vec3> verts;
     verts.reserve(flatVerts.size() / 3);
     for (size_t i = 0; i < flatVerts.size(); i += 3) {
+        if (!allFinite(flatVerts[i], flatVerts[i + 1], flatVerts[i + 2])) return -1;
         verts.push_back({flatVerts[i], flatVerts[i + 1], flatVerts[i + 2]});
     }
     body.hull.build(verts);
@@ -322,7 +325,8 @@ int DicePhysicsEngine::addStaticOpenCylinder(int userId,
     }
     if (userId < 0) return -1;
     for (const auto& s : statics_) if (s.userId == userId) return -1;
-    if (radius <= 0.0f || halfHeight <= 0.0f) return -1;
+    if (!positiveFinite(radius) || !positiveFinite(halfHeight)) return -1;
+    if (!allFinite(cx, cy, cz)) return -1;
 
     StaticBody body;
     body.userId = userId;

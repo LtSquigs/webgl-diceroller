@@ -73,7 +73,10 @@ void DicePhysicsEngine::rebuildGrid(BroadphaseGrid& grid, const BodyVec& bodies,
     for (const auto& b : bodies) {
         const float reach = 2.0f * (b.radius + std::max(expand, SPECULATIVE_MAX));
         const float spanF = std::floor(reach / GRID_CELL_SIZE) + 2.0f;
-        const size_t span = spanF >= static_cast<float>(std::max(cols, rows))
+        // `!(spanF < limit)` also catches NaN (a body whose radius or the
+        // expand went non-finite): casting NaN to size_t is UB, so such a
+        // body is bounded by the whole grid like any oversized one.
+        const size_t span = !(spanF < static_cast<float>(std::max(cols, rows)))
                                 ? std::max(cols, rows)
                                 : static_cast<size_t>(spanF);
         bound += std::min(span, cols) * std::min(span, rows);

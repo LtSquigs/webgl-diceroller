@@ -14,5 +14,5 @@
         "types": ["node"]
     },
     "include": ["src/**/*.ts", "src/types/**/*.d.ts", "src/global.d.ts"],
-    "exclude": ["node_modules", "dist", "public"]
+    "exclude": ["node_modules", "dist", "public", "src/wasm/build-*"]
 }

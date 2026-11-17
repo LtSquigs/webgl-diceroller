@@ -40,34 +40,41 @@ async function captureReplayValues(page) {
     });
 }
 
-(async () => {
+// One cold load in its own browser. Each Playwright launch gets a fresh
+// profile, so run B is a second *cold* visit, like a friend opening the link.
+// Re-navigating the same page is deliberately avoided: a warm-cache second
+// visit on SwiftShader blocks the main thread for 40-140 s before `load` (or
+// even `commit`) fires and burns the whole timeout — tracked in #365.
+async function loadAndCapture(url, label) {
     const { browser, page, errors } = await launchPage();
     page.setDefaultTimeout(LOAD_TIMEOUT_MS);
+    try {
+        await page.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
+        const settle = await waitForReplaySettled(page);
+        if (settle.skipped) {
+            console.error(`FAIL: ${settle.reason}`);
+            process.exit(1);
+        }
+        const values = await captureReplayValues(page);
+        console.log(`Run ${label}:`, JSON.stringify(values));
+        return { values, errors };
+    } finally {
+        await browser.close();
+    }
+}
+
+(async () => {
     const url = `${BASE}/${REPLAY_QUERY}`;
 
     try {
         console.log(`Opening replay URL: ${url}`);
 
-        await page.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
-        const settleA = await waitForReplaySettled(page);
-        if (settleA.skipped) {
-            console.error(`FAIL: ${settleA.reason}`);
-            process.exit(1);
-        }
-        const runA = await captureReplayValues(page);
+        const { values: runA, errors: errorsA } = await loadAndCapture(url, 'A');
+        const { values: runB, errors: errorsB } = await loadAndCapture(url, 'B');
 
-        await page.goto(url, { waitUntil: 'load', timeout: LOAD_TIMEOUT_MS });
-        const settleB = await waitForReplaySettled(page);
-        if (settleB.skipped) {
-            console.error(`FAIL: ${settleB.reason}`);
-            process.exit(1);
-        }
-        const runB = await captureReplayValues(page);
-
-        console.log('Run A:', JSON.stringify(runA));
-        console.log('Run B:', JSON.stringify(runB));
-
-        const fatalErrors = errors.filter((message) => !isBenignBrowserError(message));
+        const fatalErrors = [...errorsA, ...errorsB].filter(
+            (message) => !isBenignBrowserError(message)
+        );
         if (fatalErrors.length) {
             console.error('Browser errors:', fatalErrors);
             process.exit(1);
@@ -89,7 +96,5 @@ async function captureReplayValues(page) {
     } catch (err) {
         console.error('FAILURE:', err.message);
         process.exit(1);
-    } finally {
-        await browser.close();
     }
 })();

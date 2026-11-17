@@ -19,6 +19,17 @@ namespace dice_physics {
 // Math
 // ---------------------------------------------------------------------------
 
+/// True for a finite value strictly greater than zero. Collider registration
+/// uses this instead of `v <= 0.0f` because NaN passes that test: a NaN
+/// radius or half-extent then reaches the broadphase, where
+/// `static_cast<size_t>(NaN)` is undefined behaviour (libFuzzer found it).
+inline bool positiveFinite(float v) { return std::isfinite(v) && v > 0.0f; }
+
+/// True when every component is finite.
+inline bool allFinite(float a, float b, float c) {
+    return std::isfinite(a) && std::isfinite(b) && std::isfinite(c);
+}
+
 struct Vec3 {
     float x = 0, y = 0, z = 0;
 
